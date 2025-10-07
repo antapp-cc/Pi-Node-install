@@ -1,12 +1,9 @@
 import sys
 import os
 import urllib.request
-import ssl
 import subprocess
 import ctypes
 import json
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QProgressBar, 
-                            QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, QRect
 from PyQt5.QtGui import (QPixmap, QIcon, QColor, QLinearGradient, QPainter, QFont, 
                         QPainterPath, QRegion, QBrush, QPalette, QPen)
@@ -20,8 +17,8 @@ class ModernInstaller(QMainWindow):
         
         # 初始化变量
         self.config_urls = [
-            "http://101.201.39.109:8088/config.json",  # 阿里主服务端配置文件URL
-            "http://139.155.178.193:8088/config.json"    # 腾讯备用配置文件URL
+            阿里主服务端配置文件URL
+            腾讯备用配置文件URL
         ]
         self.current_config_url_index = 0  # 当前尝试的配置URL索引
         self.pi_network_url = ""  # 将从服务端获取
@@ -29,12 +26,6 @@ class ModernInstaller(QMainWindow):
         self.download_complete = False
         self.install_process = None
         self.remote_file_size = 0  # 远程文件大小
-        self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"  # 浏览器UA
-        
-        # 创建忽略SSL错误的上下文
-        self.ssl_context = ssl.create_default_context()
-        self.ssl_context.check_hostname = False
-        self.ssl_context.verify_mode = ssl.CERT_NONE
         
         # 设置窗口圆角
         self.setWindowRoundedCorners()
@@ -44,13 +35,6 @@ class ModernInstaller(QMainWindow):
         
         # 开始安装流程
         QTimer.singleShot(500, self.start_installation)
-    
-    def setWindowRoundedCorners(self):
-        # 创建圆角窗口
-        path = QPainterPath()
-        path.addRoundedRect(0, 0, self.width(), self.height(), 15, 15)
-        region = QRegion(path.toFillPolygon().toPolygon())
-        self.setMask(region)
         
         # 设置背景渐变
         palette = self.palette()
@@ -363,20 +347,8 @@ class ModernInstaller(QMainWindow):
                 
             current_url = self.config_urls[self.current_config_url_index]
             
-            # 发送请求获取配置文件（使用忽略SSL错误的方式）
-            request = urllib.request.Request(
-                current_url,
-                headers={'User-Agent': self.user_agent}  # 使用浏览器UA
-            )
-            
-            # 使用忽略SSL错误的上下文
-            response = urllib.request.urlopen(request, context=self.ssl_context)
-            
             # 解析JSON数据
             data = json.loads(response.read().decode('utf-8'))
-            
-            # 获取Pi Network下载地址
-            self.pi_network_url = data.get("pi_network_url", "")
             
             if not self.pi_network_url:
                 raise ValueError("配置文件中未找到Pi Network下载地址")
@@ -395,17 +367,6 @@ class ModernInstaller(QMainWindow):
     
     def check_remote_file_size(self):
         """获取远程文件大小"""
-        self.update_progress(5, "准备下载...", "检查远程文件信息...")
-        try:
-            # 发送HEAD请求获取文件大小（使用忽略SSL错误的方式）
-            request = urllib.request.Request(
-                self.pi_network_url,
-                method='HEAD',
-                headers={'User-Agent': self.user_agent}  # 使用浏览器UA
-            )
-            
-            # 使用忽略SSL错误的上下文
-            with urllib.request.urlopen(request, context=self.ssl_context) as response:
                 # 获取远程文件大小
                 self.remote_file_size = int(response.headers['Content-Length'])
                 self.update_progress(10, "远程文件信息已获取", f"文件大小: {self.remote_file_size/1024/1024:.1f} MB")
@@ -418,13 +379,6 @@ class ModernInstaller(QMainWindow):
         """下载Pi Network安装程序"""
         # 更新步骤指示器
         self.update_step(2)
-        
-        # 检查文件是否存在且大小正确
-        skip_download = False
-        if os.path.exists(self.pi_network_path):
-            local_size = os.path.getsize(self.pi_network_path)
-            self.update_progress(10, "检查本地文件...", f"本地文件存在 ({local_size/1024/1024:.1f} MB)")
-            
             # 检查文件大小
             if local_size == self.remote_file_size:
                 skip_download = True
@@ -432,8 +386,6 @@ class ModernInstaller(QMainWindow):
             else:
                 self.update_progress(10, "本地文件无效", f"大小不匹配 ({local_size} vs {self.remote_file_size})")
                 try:
-                    os.remove(self.pi_network_path)
-                    self.update_progress(15, "已删除无效文件", "准备重新下载")
                 except Exception as e:
                     self.show_error(f"删除无效文件失败: {str(e)}")
         
@@ -453,12 +405,6 @@ class ModernInstaller(QMainWindow):
                             "下载PiNetwork节点软件...", 
                             f"下载中: {min(100, percent)}% ({download_mb:.1f}MB/{total_mb:.1f}MB)"
                         )
-                
-                # 使用自定义的urlretrieve函数，避免SSL错误
-                self.custom_urlretrieve(
-                    self.pi_network_url,
-                    self.pi_network_path,
-                    reporthook=report_progress
                 )
                 
                 self.download_complete = True
@@ -471,13 +417,6 @@ class ModernInstaller(QMainWindow):
             self.download_complete = True
             self.update_progress(85, "文件已存在且有效", "跳过下载...")
             QTimer.singleShot(500, self.install_pi_network)
-    
-    def custom_urlretrieve(self, url, filename, reporthook=None):
-        """自定义的urlretrieve函数，避免SSL错误"""
-        request = urllib.request.Request(
-            url,
-            headers={'User-Agent': self.user_agent}  # 使用浏览器UA
-        )
         
         with urllib.request.urlopen(request, context=self.ssl_context) as response:
             # 获取文件大小
@@ -515,9 +454,7 @@ class ModernInstaller(QMainWindow):
             return
             
         # 运行wsl -l -v命令
-        self.update_progress(85, "运行WSL检查...", "执行wsl -l -v命令...")
         try:
-            subprocess.Popen("wsl -l -v", shell=True, 
                             stdout=subprocess.PIPE, 
                             stderr=subprocess.PIPE)
         except Exception as e:
@@ -532,9 +469,6 @@ class ModernInstaller(QMainWindow):
         
         try:
             # 启动安装程序
-            self.install_process = subprocess.Popen(
-                [self.pi_network_path, "/S"], 
-                shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
@@ -543,11 +477,6 @@ class ModernInstaller(QMainWindow):
             self.install_timer = QTimer()
             self.install_timer.timeout.connect(self.check_install_status)
             self.install_timer.start(1000)  # 每秒检查一次
-            
-            # 设置超时
-            QTimer.singleShot(180000, self.check_install_timeout)  # 3分钟超时
-        except Exception as e:
-            self.show_error(f"安装失败: {str(e)}")
     
     def check_install_status(self):
         # 检查安装进程状态
@@ -571,17 +500,7 @@ class ModernInstaller(QMainWindow):
     
     def complete_installation(self):
         # 更新步骤指示器
-        self.update_step(4)
-        
-        # 安装完成后的清理工作
-        self.update_progress(100, "安装完成!", "清理临时文件...")
-        
-        try:
-            if os.path.exists(self.pi_network_path):
-                os.remove(self.pi_network_path)
-        except Exception as e:
-            print(f"删除临时文件失败: {str(e)}")
-        
+        self.update_step
         # 显示完成界面
         QTimer.singleShot(1000, self.show_completion_window)
     
@@ -771,16 +690,6 @@ class ModernInstaller(QMainWindow):
             }
         """)
         
-        # 添加倒计时标签
-        self.countdown_label = QLabel()
-        self.countdown_label.setAlignment(Qt.AlignCenter)
-        self.countdown_label.setStyleSheet("""
-            QLabel {
-                color: #FFA726;
-                font-size: 14px;
-            }
-        """)
-        
         # 关闭按钮
         close_button = QPushButton("完成")
         close_button.setFixedSize(120, 40)
@@ -815,13 +724,6 @@ class ModernInstaller(QMainWindow):
         
         # 隐藏主窗口
         self.hide()
-        
-        # 开始倒计时
-        self.countdown_timer = QTimer()
-        self.countdown_timer.timeout.connect(self.update_countdown)
-        self.countdown = 10  # 10秒倒计时
-        self.update_countdown()  # 立即更新一次
-        self.countdown_timer.start(1000)  # 每秒更新一次
     
     def update_countdown(self):
         # 更新倒计时
@@ -853,13 +755,6 @@ class ModernInstaller(QMainWindow):
         if hasattr(self, 'drag_position') and event.buttons() == Qt.LeftButton:
             self.move(event.globalPos() - self.drag_position)
             event.accept()
-
-def is_admin():
-    """检查是否以管理员权限运行"""
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
 
 if __name__ == "__main__":
     # 检查管理员权限
@@ -896,4 +791,5 @@ if __name__ == "__main__":
     installer = ModernInstaller()
     installer.show()
     
+
     sys.exit(app.exec_())
