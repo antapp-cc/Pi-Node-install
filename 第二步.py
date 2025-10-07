@@ -6,9 +6,6 @@ import json
 import subprocess
 import time
 import ctypes
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QProgressBar,
-                            QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QMessageBox,
-                            QDesktopWidget)
 from PyQt5.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, QRect
 from PyQt5.QtGui import (QPixmap, QIcon, QColor, QLinearGradient, QPainter, QFont,
                         QPainterPath, QRegion, QBrush, QPalette, QPen)
@@ -22,8 +19,8 @@ class ModernInstaller(QMainWindow):
         
         # 配置URL列表
         self.config_urls = [
-            "http://101.201.39.109:8088/config.json",  # 阿里主服务端配置文件URL
-            "http://139.155.178.193:8088/config.json",  # 腾讯备用服务端配置文件URL
+            主服务端配置文件URL
+            备用服务端配置文件URL
         ]
         
         # 临时文件路径
@@ -38,7 +35,6 @@ class ModernInstaller(QMainWindow):
         self.install_process = None
         self.drag_position = None
         self.config_list = []  # 存储所有成功的配置
-        self.user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'  # 浏览器UA
 
         # 设置窗口圆角
         self.setWindowRoundedCorners()
@@ -360,11 +356,6 @@ class ModernInstaller(QMainWindow):
                 # 创建请求对象并设置User-Agent
                 req = urllib.request.Request(config_url, headers={'User-Agent': self.user_agent})
                 
-                # 创建不验证SSL的上下文
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
-                
                 # 下载配置文件
                 with urllib.request.urlopen(req, context=ssl_context) as response:
                     config_content = response.read().decode('utf-8')
@@ -454,12 +445,7 @@ class ModernInstaller(QMainWindow):
                     continue  # 跳过无效URL
                     
                 # 创建请求对象并设置User-Agent
-                req = urllib.request.Request(url, headers={'User-Agent': self.user_agent})
-                
-                # 创建不验证SSL的上下文
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(url, headers={'User-Agent': self.user_agent}
                 
                 # 获取远程文件大小
                 with urllib.request.urlopen(req, context=ssl_context) as response:
@@ -540,8 +526,6 @@ class ModernInstaller(QMainWindow):
         self.update_progress(60, "安装OpenVPN...", "运行安装程序...")
         try:
             # 静默安装OpenVPN
-            subprocess.run(["msiexec", "/i", self.openvpn_path, "/passive"], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            self.update_progress(70, "OpenVPN安装完成", "验证安装...")
         except Exception as e:
             self.show_error(f"OpenVPN安装失败: {str(e)}")
         
@@ -549,8 +533,6 @@ class ModernInstaller(QMainWindow):
         self.update_progress(70, "安装WSL更新...", "运行安装程序...")
         try:
             # 静默安装WSL更新
-            subprocess.run(["msiexec", "/i", self.wsl_update_path, "/passive"], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            self.update_progress(80, "WSL更新安装完成", "验证安装...")
         except Exception as e:
             self.show_error(f"WSL更新安装失败: {str(e)}")
         
@@ -558,8 +540,6 @@ class ModernInstaller(QMainWindow):
         self.update_progress(80, "配置WSL...", "设置默认版本为2...")
         try:
             # 设置WSL默认版本为2
-            subprocess.run(["wsl", "--set-default-version", "2"], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            self.update_progress(90, "WSL配置完成", "验证配置...")
         except Exception as e:
             self.show_error(f"WSL配置失败: {str(e)}")
         
@@ -567,8 +547,6 @@ class ModernInstaller(QMainWindow):
         self.update_progress(90, "安装Docker...", "运行安装程序...")
         try:
             # 静默安装Docker
-            subprocess.run([self.docker_path, "install", "--quiet", "--accept-license"], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            self.update_progress(100, "Docker安装完成", "验证安装...")
         except Exception as e:
             self.show_error(f"Docker安装失败: {str(e)}")
         
@@ -913,4 +891,5 @@ if __name__ == "__main__":
     installer = ModernInstaller()
     installer.show()
     
+
     sys.exit(app.exec_())
