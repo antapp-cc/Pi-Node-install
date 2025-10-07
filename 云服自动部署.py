@@ -2,45 +2,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import paramiko
 import threading
-import time
-import os
-import re
-from datetime import datetime
-import logging
 import json
 import sys
 import ctypes
-
-def is_admin():
-    """检查是否以管理员权限运行"""
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except Exception:
-        return False
-
-def run_as_admin():
-    """以管理员权限重新运行程序"""
-    try:
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        sys.exit()
-    except Exception:
-        pass
-
-# 如果不是管理员，则请求管理员权限
-if os.name == "nt" and not is_admin():
-    run_as_admin()
-
-class DarkTheme:
-    BG = "#474747"        # 背景
-    CARD = "#474747"        # 卡片
-    TEXT = "#99ffff"        # 主文字 (slate-900)
-    MUTED = "#D9D9D8"    # 次级 (slate-600)
-    BORDER = "#3d3d3d"    # 边框 (slate-200)
-    ACCENT = "#3b82f6"    # 蓝色主色
-    OK = "#16a34a"
-    WARN = "#d97706"
-    ERR = "#ef4444"
-
+        
     @staticmethod
     def apply(style: ttk.Style):
         style.theme_use("clam")
@@ -55,10 +20,6 @@ class DarkTheme:
             font=("Segoe UI", 10)
         )
 
-        # 容器
-        style.configure("Card.TFrame", background=DarkTheme.CARD)
-        style.configure("TFrame", background=DarkTheme.BG)
-
         # 分组框
         style.configure("Group.TLabelframe",
                         background=DarkTheme.CARD, foreground=DarkTheme.MUTED,
@@ -67,15 +28,6 @@ class DarkTheme:
                         font=("Segoe UI Semibold", 10),
                         foreground=DarkTheme.MUTED,
                         background=DarkTheme.CARD)
-
-        # 标签
-        style.configure("Title.TLabel", font=("Segoe UI Semibold", 14),
-                        foreground=DarkTheme.TEXT, background=DarkTheme.BG)
-        style.configure("Sub.TLabel", font=("Segoe UI", 9),
-                        foreground=DarkTheme.MUTED, background=DarkTheme.BG)
-        style.configure("Muted.TLabel", foreground=DarkTheme.MUTED, background=DarkTheme.CARD)
-        style.configure("Warning.TLabel", foreground=DarkTheme.WARN, background=DarkTheme.CARD,
-                        font=("Segoe UI", 8))
 
         # 输入
         style.configure("Clean.TEntry",
@@ -183,14 +135,6 @@ class OpenVPNInstaller:
         ttk.Label(lf, text="密码：", style="Muted.TLabel").grid(row=2, column=0, sticky="w")
         self.password = ttk.Entry(lf, width=24, style="Clean.TEntry")
         self.password.grid(row=3, column=0, sticky="ew", pady=(4, 0))
-        
-        # 添加输入法切换提示标签
-        self.input_method_label = ttk.Label(
-            lf, 
-            text="* 输入密码时已自动切换为英文输入法",
-            style="Warning.TLabel"
-        )
-        self.input_method_label.grid(row=4, column=0, sticky="w", pady=(4, 0))
 
         # 右列
         rf = ttk.Frame(frm, style="Card.TFrame")
@@ -208,10 +152,6 @@ class OpenVPNInstaller:
         frm.grid_columnconfigure(0, weight=1)
         frm.grid_columnconfigure(1, weight=1)
 
-        # 绑定焦点事件以切换输入法
-        self.password.bind("<FocusIn>", self.switch_to_english_input)
-        self.password.bind("<FocusOut>", self.restore_input_method)
-
         # 动作卡片
         actions = ttk.Frame(top)
         actions.pack(side=tk.RIGHT, padx=(10, 0))
@@ -221,14 +161,6 @@ class OpenVPNInstaller:
         self.progress = ttk.Progressbar(actions, mode="indeterminate", length=180,
                                         style="Clean.Horizontal.TProgressbar")
         self.progress.grid(row=1, column=0, sticky="ew")
-
-        # 状态指示器
-        status = ttk.Frame(container)
-        status.pack(fill=tk.X, pady=(10, 4))
-        
-        # 创建状态指示器框架
-        status_container = ttk.Frame(status, style="Card.TFrame")
-        status_container.pack(fill=tk.X, expand=True)
         
         # 添加四个状态指示器
         self.pill_conn = StatusPill(status_container, "连接状态", "未连接", DarkTheme.MUTED)
@@ -312,15 +244,6 @@ class OpenVPNInstaller:
             user32.keybd_event(0x10, 0, 0, 0)  # 按下Shift键
             user32.keybd_event(0x10, 0, 2, 0)  # 释放Shift键
 
-            # 获取当前输入法并存储
-            foreground_hwnd = user32.GetForegroundWindow()
-            thread_id = user32.GetWindowThreadProcessId(foreground_hwnd, None)
-            self.original_input_method = imm32.ImmGetDefaultIMEWnd(thread_id)
-            
-            self.log_message("输入法已切换为英文模式", "info")
-        except Exception as e:
-            self.log_message(f"⚠ 无法切换输入法: {str(e)}", "warning")
-
     def restore_input_method(self, event):
         """恢复原始输入法状态"""
         try:
@@ -403,9 +326,6 @@ class OpenVPNInstaller:
             self.log_message("下载OpenVPN安装脚本...", "info")
             self.pill_vpn.update("安装中...", DarkTheme.WARN)  # 更新VPN状态
             
-            install_cmd = "wget -O openvpn-install.sh https://raw.githubusercontent.com/Nyr/openvpn-install/master/openvpn-install.sh"
-            stdin, stdout, stderr = self.ssh_client.exec_command(install_cmd)
-            
             exit_status = stdout.channel.recv_exit_status()
             if exit_status != 0:
                 error = stderr.read().decode()
@@ -415,10 +335,6 @@ class OpenVPNInstaller:
             
             self.log_message("✓ 脚本下载完成", "success")
             self.log_message("设置执行权限...", "info")
-            
-            stdin, stdout, stderr = self.ssh_client.exec_command("chmod +x openvpn-install.sh")
-            exit_status = stdout.channel.recv_exit_status()
-            if exit_status != 0:
                 error = stderr.read().decode()
                 self.log_message(f"权限设置失败: {error}", "error")
                 self.pill_vpn.update("安装失败", DarkTheme.ERR)  # 更新VPN状态
@@ -427,28 +343,6 @@ class OpenVPNInstaller:
             self.log_message("✓ 权限设置完成", "success")
             
             self.log_message(f"开始安装OpenVPN (端口: {vpn_port})...", "info")
-            
-            dns_map = {
-                "Cloudflare": "1",
-                "Google": "2",
-                "OpenDNS": "3",
-                "Quad9": "4",
-                "AdGuard": "5"
-            }
-            dns_option = dns_map.get(dns_server, "1")
-            
-            responses = [
-                "",
-                str(vpn_port),
-                "",
-                dns_option,
-                compression,
-                "n",
-                "n",
-                "",
-                "1",
-                client_name
-            ]
             
             responses_json = json.dumps(responses)
             self.log_message(f"使用配置响应: {responses}", "debug")
@@ -503,32 +397,6 @@ class OpenVPNInstaller:
             
             # 安装端口转发
             self.log_message("开始安装端口转发工具...", "service")
-            self.pill_pf.update("配置中...", DarkTheme.WARN)  # 更新端口转发状态
-            
-            install_cmd = "apt-get install rinetd"  # 安装端口转发
-            self.log_message("执行安装端口转发", "service")
-            
-            stdin, stdout, stderr = self.ssh_client.exec_command(install_cmd)
-            exit_status = stdout.channel.recv_exit_status()
-            if exit_status != 0:
-                error = stderr.read().decode()
-                self.log_message(f"端口转发安装失败: {error}", "error")
-                self.pill_pf.update("安装失败", DarkTheme.ERR)  # 更新端口转发状态
-                return
-            
-            self.log_message("✓ 端口转发安装完成", "service")
-            
-            port_rules = """# 蚁巢 Pi-Node节点端口转发
-0.0.0.0 31400 10.8.0.2 31400
-0.0.0.0 31401 10.8.0.2 31401
-0.0.0.0 31402 10.8.0.2 31402
-0.0.0.0 31403 10.8.0.2 31403
-0.0.0.0 31404 10.8.0.2 31404
-0.0.0.0 31405 10.8.0.2 31405
-0.0.0.0 31406 10.8.0.2 31406
-0.0.0.0 31407 10.8.0.2 31407
-0.0.0.0 31408 10.8.0.2 31408
-0.0.0.0 31409 10.8.0.2 31409
 """
             conf_cmd = f"""echo '{port_rules}' > /etc/rinetd.conf"""
             stdin, stdout, stderr = self.ssh_client.exec_command(conf_cmd)
@@ -541,15 +409,6 @@ class OpenVPNInstaller:
             
             self.log_message("✓ 端口转发配置完成", "service")
             
-            start_cmd = "rinetd -c /etc/rinetd.conf"
-            stdin, stdout, stderr = self.ssh_client.exec_command(start_cmd)
-            exit_status = stdout.channel.recv_exit_status()
-            if exit_status != 0:
-                error = stderr.read().decode()
-                self.log_message(f"启动端口转发失败: {error}", "error")
-                self.pill_pf.update("启动失败", DarkTheme.ERR)  # 更新端口转发状态
-                return
-            
             self.log_message("✓ 端口转发服务已启动", "service")
             self.log_message("端口转发规则已生效:", "service")
             self.log_message(port_rules, "service")
@@ -558,13 +417,6 @@ class OpenVPNInstaller:
             # 文件下载部分
             self.log_message("下载客户端配置文件...", "info")
             self.pill_dl.update("导入中...", DarkTheme.WARN)  # 更新导入状态
-            
-            if not config_path:
-                config_path = f"/root/{client_name}.ovpn"
-            
-            target_dir = r"C:\Program Files\OpenVPN\config"
-            os.makedirs(target_dir, exist_ok=True)
-            local_path = os.path.join(target_dir, f"{client_name}.ovpn")
             
             try:
                 sftp = self.ssh_client.open_sftp()
@@ -589,11 +441,7 @@ class OpenVPNInstaller:
                 self.log_message(f"    scp {username}@{server_ip}:{config_path} \"{local_path}\"", "warning")
             
             self.log_message("安装完成，可以直接连接云服，无需手动导入！", "success")
-            
-        except Exception as e:
-            self.log_message(f"⚠ 发生错误: {str(e)}", "error")
-            import traceback
-            self.log_message(traceback.format_exc(), "error")
+
             # 更新所有状态为错误
             self.pill_conn.update("连接失败", DarkTheme.ERR)
             self.pill_vpn.update("安装失败", DarkTheme.ERR)
@@ -616,4 +464,5 @@ class OpenVPNInstaller:
 if __name__ == "__main__":
     root = tk.Tk()
     app = OpenVPNInstaller(root)
+
     root.mainloop()
