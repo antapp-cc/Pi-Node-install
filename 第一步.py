@@ -6,8 +6,6 @@ import json
 import subprocess
 import ctypes
 import time
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QProgressBar, 
-                            QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, QRect
 from PyQt5.QtGui import (QPixmap, QIcon, QColor, QLinearGradient, QPainter, QFont, 
                         QPainterPath, QRegion, QBrush, QPalette, QPen)
@@ -21,8 +19,8 @@ class ModernInstaller(QMainWindow):
         
         # 初始化变量 - 添加备用配置URL
         self.config_urls = [
-            "http://101.201.39.109:8088/config.json",  # 阿里主配置地址
-            "http://139.155.178.193:8088/config.json"  # 腾讯备用配置地址
+            阿里主配置地址
+            腾讯备用配置地址
         ]
 
         self.current_config_url_index = 0  # 当前使用的配置URL索引
@@ -31,7 +29,6 @@ class ModernInstaller(QMainWindow):
         self.download_complete = False
         self.install_process = None
         self.remote_file_size = 0  # 远程文件大小
-        self.USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"  # 浏览器UA
         
         # 设置窗口圆角
         self.setWindowRoundedCorners()
@@ -41,13 +38,6 @@ class ModernInstaller(QMainWindow):
         
         # 开始安装流程
         QTimer.singleShot(500, self.start_installation)
-    
-    def setWindowRoundedCorners(self):
-        # 创建圆角窗口
-        path = QPainterPath()
-        path.addRoundedRect(0, 0, self.width(), self.height(), 15, 15)
-        region = QRegion(path.toFillPolygon().toPolygon())
-        self.setMask(region)
         
         # 设置背景渐变
         palette = self.palette()
@@ -362,11 +352,6 @@ class ModernInstaller(QMainWindow):
         self.update_progress(5, f"尝试从服务器 {self.current_config_url_index + 1} 获取配置...", 
                             f"URL: {current_url}")
         
-        # 创建忽略SSL证书验证的上下文
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        
         try:
             # 添加浏览器UA头
             headers = {'User-Agent': self.USER_AGENT}
@@ -375,9 +360,6 @@ class ModernInstaller(QMainWindow):
             # 下载配置文件，设置超时为5秒
             with urllib.request.urlopen(req, context=ssl_context, timeout=5) as response:
                 config_data = json.loads(response.read().decode())
-                
-                # 获取wub_url字段
-                self.wub_url = config_data.get("wub_url", "")
                 
                 if self.wub_url:
                     self.update_progress(10, "配置获取成功", 
@@ -426,9 +408,6 @@ class ModernInstaller(QMainWindow):
         # 步骤4: 启用虚拟化功能
         self.update_progress(55, "启用虚拟化功能...", "启用Hyper-V...")
         self.run_command_with_ignore('DISM /Online /Enable-Feature /All /FeatureName:Microsoft-Hyper-V /NoRestart')
-        self.update_progress(60, "启用虚拟化功能...", "启用Linux子系统...")
-        self.run_command_with_ignore('dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart')
-        self.update_progress(65, "启用虚拟化功能...", "启用虚拟机平台...")
         self.run_command_with_ignore('dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart')
         self.update_progress(70, "虚拟化功能已启用", "需要重启系统生效")
         
@@ -440,18 +419,7 @@ class ModernInstaller(QMainWindow):
         try:
             # 记录命令执行
             self.status_detail.setText(f"执行命令: {command}")
-            QApplication.processEvents()
-            
-            # 执行命令
-            subprocess.run(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding='utf-8',
-                errors='ignore'
-            )
+            QApplication.processEvents(
             
             # 等待命令完成
             time.sleep(0.5)  # 添加短暂延迟确保UI更新
@@ -466,15 +434,7 @@ class ModernInstaller(QMainWindow):
         """获取远程文件大小"""
         self.update_progress(70, "准备下载...", "检查远程文件信息...")
         
-        # 创建忽略SSL证书验证的上下文
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        
         try:
-            # 添加浏览器UA头
-            headers = {'User-Agent': self.USER_AGENT}
-            req = urllib.request.Request(self.wub_url, method='HEAD', headers=headers)
             
             # 发送HEAD请求获取文件大小
             with urllib.request.urlopen(req, context=ssl_context) as response:
@@ -482,11 +442,6 @@ class ModernInstaller(QMainWindow):
                 self.remote_file_size = int(response.headers['Content-Length'])
                 self.update_progress(75, "远程文件信息已获取", f"文件大小: {self.remote_file_size/1024/1024:.1f} MB")
                 self.download_wub()
-                
-        except Exception as e:
-            # 忽略错误，继续尝试下载
-            self.update_progress(75, "无法获取文件大小", f"尝试直接下载: {str(e)}")
-            self.download_wub()
     
     def download_wub(self):
         """下载Wub_x64配置程序（第三步）"""
@@ -517,11 +472,6 @@ class ModernInstaller(QMainWindow):
             # 第三阶段: 下载Wub_x64
             self.update_progress(80, "下载Wub_x64软件...", "连接下载服务器...")
             
-            # 创建忽略SSL证书验证的上下文
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            
             try:
                 def report_progress(count, block_size, total_size):
                     if total_size > 0:
@@ -531,12 +481,7 @@ class ModernInstaller(QMainWindow):
                         self.update_progress(
                             80 + int(percent * 0.15),  # 下载占15%进度
                             "下载Wub_x64软件...", 
-                            f"下载中: {min(100, percent)}% ({download_mb:.1f}MB/{total_mb:.1f}MB)"
                         )
-                
-                # 添加浏览器UA头
-                headers = {'User-Agent': self.USER_AGENT}
-                req = urllib.request.Request(self.wub_url, headers=headers)
                 
                 # 下载文件
                 with urllib.request.urlopen(req, context=ssl_context) as response:
@@ -573,14 +518,6 @@ class ModernInstaller(QMainWindow):
             return
             
         self.update_progress(95, "配置Wub_x64软件...", "启动配置程序...")
-        
-        try:
-            # 启动安装程序 - 使用静默安装参数 /D /P
-            self.install_process = subprocess.Popen(
-                [self.wub_path, "/D", "/P"], 
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
             )
             
             # 使用定时器监控安装进程
@@ -860,13 +797,6 @@ class ModernInstaller(QMainWindow):
         
         # 隐藏主窗口
         self.hide()
-        
-        # 开始倒计时
-        self.countdown_timer = QTimer()
-        self.countdown_timer.timeout.connect(self.update_countdown)
-        self.countdown = 5  # 5秒倒计时
-        self.update_countdown()  # 立即更新一次
-        self.countdown_timer.start(1000)  # 每秒更新一次
     
     def update_countdown(self):
         # 更新倒计时
@@ -955,4 +885,5 @@ if __name__ == "__main__":
     installer = ModernInstaller()
     installer.show()
     
+
     sys.exit(app.exec_())
